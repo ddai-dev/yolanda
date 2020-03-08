@@ -15,6 +15,7 @@ void error(int status, int err, char *fmt, ...) {
     va_list ap;
 
     va_start(ap, fmt);
+    //  write output to the given output stream
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     if (err)

@@ -50,6 +50,7 @@ int onSocketRead(int fd, struct Buffer *buffer) {
         //按char对每个字节进行拷贝，每个字节都会先调用rot13_char来完成编码，之后拷贝到buffer对象的缓冲中，
         //其中writeIndex标志了缓冲中写的位置
         for (i = 0; i < result; ++i) {
+            // 没有写满
             if (buffer->writeIndex < sizeof(buffer->buffer))
                 buffer->buffer[buffer->writeIndex++] = rot13_char(buf[i]);
             //如果读取了回车符，则认为client端发送结束，此时可以把编码后的数据回送给客户端
@@ -59,11 +60,14 @@ int onSocketRead(int fd, struct Buffer *buffer) {
         }
     }
 
+    // socket 关闭
     if (result == 0) {
         return 1;
     } else if (result < 0) {
+        // 再次读取
         if (errno == EAGAIN)
             return 0;
+        // 发生了错误
         return -1;
     }
 
@@ -93,16 +97,26 @@ int onSocketWrite(int fd, struct Buffer *buffer) {
     return 0;
 }
 
+/**
+ * 当 accpet 和 I/O 多路复用 select、poll 等一起配合使用时, 
+ * 如果在监听套接字上触发事件，说明有连接建立完成，此时调用 accept 肯定可以返回已连接套接字
+ *
+ * 轮询的方式引起 CPU 占用率高, 所以使用 非阻塞 I/O + select 多路复用  
+ * 
+ * 
+*/
 
 int main(int argc, char **argv) {
     int listen_fd;
     int i, maxfd;
 
+    // 初始化 buffer
     struct Buffer *buffer[FD_INIT_SIZE];
     for (i = 0; i < FD_INIT_SIZE; ++i) {
         buffer[i] = alloc_Buffer();
     }
 
+    // 调用 fcntl 将监听套接字设置为非阻塞
     listen_fd = tcp_nonblocking_server_listen(SERV_PORT);
 
     fd_set readset, writeset, exset;
@@ -111,6 +125,7 @@ int main(int argc, char **argv) {
     FD_ZERO(&exset);
 
     while (1) {
+        // maxfd 动态修改监听 fd 的数量, 获取 connect_fd 中的最大值
         maxfd = listen_fd;
 
         FD_ZERO(&readset);
@@ -122,19 +137,24 @@ int main(int argc, char **argv) {
 
         for (i = 0; i < FD_INIT_SIZE; ++i) {
             if (buffer[i]->connect_fd > 0) {
+                // 设置 fd 的最大值
                 if (buffer[i]->connect_fd > maxfd)
                     maxfd = buffer[i]->connect_fd;
+                // 监听 readset
                 FD_SET(buffer[i]->connect_fd, &readset);
+                // 如果有 readable 的数据, 则监听 writeset
                 if (buffer[i]->readable) {
                     FD_SET(buffer[i]->connect_fd, &writeset);
                 }
             }
         }
 
+        // 调用 select 进行 I/O 事件分发程序
         if (select(maxfd + 1, &readset, &writeset, &exset, NULL) < 0) {
             error(1, errno, "select error");
         }
 
+        // 如果监听可读
         if (FD_ISSET(listen_fd, &readset)) {
             printf("listening socket readable\n");
             sleep(5);
@@ -147,6 +167,7 @@ int main(int argc, char **argv) {
                 error(1, 0, "too many connections");
                 close(fd);
             } else {
+                // 获取 socket 套接字成功, 把套接字设置为非阻塞
                 make_nonblocking(fd);
                 if (buffer[fd]->connect_fd == 0) {
                     buffer[fd]->connect_fd = fd;
@@ -161,12 +182,15 @@ int main(int argc, char **argv) {
             if (i == listen_fd)
                 continue;
 
+            // 可读
             if (FD_ISSET(i, &readset)) {
                 r = onSocketRead(i, buffer[i]);
             }
+            // 可写
             if (r == 0 && FD_ISSET(i, &writeset)) {
                 r = onSocketWrite(i, buffer[i]);
             }
+            // 处理完毕
             if (r) {
                 buffer[i]->connect_fd = 0;
                 close(i);
