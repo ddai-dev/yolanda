@@ -34,7 +34,7 @@
  * 
  * 读写可以在 "returned events" 复用
  * 
- * 错误
+ * 错误 (没有办法通过 poll 向系统内核递交检测请求，只能通过“returned events”来加以检测)
  * #define POLLERR    0x0008     一些错误发送 
  * #define POLLHUP    0x0010     描述符挂起 
  * #define POLLNVAL   0x0020     请求的事件无效 

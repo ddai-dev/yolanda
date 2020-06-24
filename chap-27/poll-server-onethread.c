@@ -46,6 +46,7 @@ int onConnectionClosed(struct tcp_connection *tcpConnection) {
 
 int main(int c, char **v) {
     //主线程event_loop
+    // 即 reactor 对象，这个 event_loop 和线程相关联，每个 event_loop 在线程里执行的是一个无限循环，以便完成事件的分发
     struct event_loop *eventLoop = event_loop_init();
 
     //初始化acceptor
@@ -57,5 +58,6 @@ int main(int c, char **v) {
     tcp_server_start(tcpServer);
 
     // main thread for acceptor
+    // 运行 event_loop 无限循环，等待 acceptor 上有连接建立、新连接上有数据可读等
     event_loop_run(eventLoop);
 }

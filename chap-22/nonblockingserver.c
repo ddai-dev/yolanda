@@ -177,12 +177,16 @@ int main(int argc, char **argv) {
             }
         }
 
+        // 遍历所有描述符, 最后的处理还是在上面的循环处理 buffer
         for (i = 0; i < maxfd + 1; ++i) {
             int r = 0;
             if (i == listen_fd)
                 continue;
 
             // 可读
+            // r==1  完成
+            // r==0  读取了部分数据
+            // r==-1 错误
             if (FD_ISSET(i, &readset)) {
                 r = onSocketRead(i, buffer[i]);
             }

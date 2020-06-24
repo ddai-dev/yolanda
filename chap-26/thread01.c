@@ -3,6 +3,7 @@
 extern void loop_echo(int);
 
 void thread_run(void *arg) {
+    // 子线程独自负责线程资源回收
     pthread_detach(pthread_self());
     int fd = (int) arg;
     loop_echo(fd);

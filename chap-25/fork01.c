@@ -17,6 +17,7 @@ void child_run(int fd) {
     size_t outbuf_used = 0;
     ssize_t result;
 
+    // 通过一个循环, 来实现 client server 通信
     while (1) {
         char ch;
         result = recv(fd, &ch, 1, 0);
@@ -41,6 +42,8 @@ void child_run(int fd) {
 }
 
 
+// 所有已终止的子进程
+// WNOHANG: 用来告诉内核，即使还有未终止的子进程也不要阻塞在 waitpid 上
 void sigchld_handler(int sig) {
     while (waitpid(-1, 0, WNOHANG) > 0);
     return;
@@ -48,6 +51,7 @@ void sigchld_handler(int sig) {
 
 int main(int c, char **v) {
     int listener_fd = tcp_server_listen(SERV_PORT);
+    // 子进程状态变化
     signal(SIGCHLD, sigchld_handler);
     while (1) {
         struct sockaddr_storage ss;
@@ -59,6 +63,7 @@ int main(int c, char **v) {
         }
 
         if (fork() == 0) {
+            // 创建子进程
             close(listener_fd);
             child_run(fd);
             exit(0);
